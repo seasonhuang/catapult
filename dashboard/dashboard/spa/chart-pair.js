@@ -321,6 +321,7 @@ tr.exportTo('cp', () => {
         let closestTimestamp = Infinity;
         const minTimestampMs = new Date() - cp.MS_PER_MONTH;
         for (const timeseries of timeserieses) {
+          if (!timeseries || !timeseries.length) continue;
           const datum = tr.b.findClosestElementInSortedArray(
               timeseries, d => d.timestamp, minTimestampMs);
           if (!datum) continue;

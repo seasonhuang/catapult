@@ -18,6 +18,10 @@ tr.exportTo('cp', () => {
     }
 
     async onBlur_(event) {
+      if (event.relatedTarget === this ||
+          cp.isElementChildOf(event.relatedTarget, this)) {
+        return;
+      }
       await this.dispatch('close', this.statePath);
     }
 
