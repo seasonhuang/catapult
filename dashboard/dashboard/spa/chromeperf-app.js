@@ -547,12 +547,12 @@ tr.exportTo('cp', () => {
       };
     },
 
-    newAlerts: (state, action, rootState) => {
+    newAlerts: (state, {sectionId, options}, rootState) => {
       for (const alerts of Object.values(state.alertsSectionsById)) {
         // If the user mashes the ALERTS button, don't open copies of the same
         // alerts section.
         // TODO scroll to the matching alerts section.
-        if (!cp.AlertsSection.matchesOptions(alerts, action.options)) continue;
+        if (!cp.AlertsSection.matchesOptions(alerts, options)) continue;
         if (state.alertsSectionIds.includes(alerts.sectionId)) return state;
         return {
           ...state,
@@ -564,12 +564,8 @@ tr.exportTo('cp', () => {
         };
       }
 
-      const sectionId = action.sectionId || tr.b.GUID.allocateSimple();
-      const newSection = {
-        type: cp.AlertsSection.is,
-        sectionId,
-        ...cp.AlertsSection.buildState(action.options || {}),
-      };
+      if (!sectionId) sectionId = tr.b.GUID.allocateSimple();
+      const newSection = cp.AlertsSection.buildState({sectionId, ...options});
       const alertsSectionsById = {...state.alertsSectionsById};
       alertsSectionsById[sectionId] = newSection;
       state = {...state};

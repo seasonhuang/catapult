@@ -13,36 +13,6 @@ tr.exportTo('cp', () => {
   const RECOMMENDED_SHERIFFS = [
     'Chromium Perf Sheriff',
   ];
-  const SHERIFFS = [
-    'ARC Perf Sheriff',
-    'Angle Perf Sheriff',
-    'Binary Size Sheriff',
-    'Blink Memory Mobile Sheriff',
-    'Chrome OS Graphics Perf Sheriff',
-    'Chrome OS Installer Perf Sheriff',
-    'Chrome OS Perf Sheriff',
-    'Chrome Perf Accessibility Sheriff',
-    'Chromium Perf AV Sheriff',
-    'Chromium Perf Sheriff - Sub-series',
-    'Chromium Perf Sheriff',
-    'CloudView Perf Sheriff',
-    'Cronet Perf Sheriff',
-    'Fuchsia Perf Sheriff',
-    'Histogram FYI',
-    'Jochen',
-    'Mojo Perf Sheriff',
-    'NaCl Perf Sheriff',
-    'Network Service Sheriff',
-    'OWP Storage Perf Sheriff',
-    'Oilpan Perf Sheriff',
-    'Pica Sheriff',
-    'Power Perf Sheriff',
-    'Service Worker Perf Sheriff',
-    'Tracing Perftests Sheriff',
-    'V8 Memory Perf Sheriff',
-    'V8 Perf Sheriff',
-    'WebView Perf Sheriff',
-  ];
 
   class NewBugRequest extends cp.RequestBase {
     constructor(options) {
@@ -99,17 +69,20 @@ tr.exportTo('cp', () => {
     }
 
     showSheriff_(bug, report) {
-      return ((bug.selectedOptions.length === 0) &&
+      return (bug && bug.selectedOptions && report && report.selectedOptions &&
+              (bug.selectedOptions.length === 0) &&
               (report.selectedOptions.length === 0));
     }
 
     showBug_(sheriff, report) {
-      return ((sheriff.selectedOptions.length === 0) &&
+      return (sheriff && sheriff.selectedOptions && report && report.selectedOptions &&
+              (sheriff.selectedOptions.length === 0) &&
               (report.selectedOptions.length === 0));
     }
 
     showReport_(sheriff, bug) {
-      return ((sheriff.selectedOptions.length === 0) &&
+      return (sheriff && sheriff.selectedOptions && bug && bug.selectedOptions &&
+              (sheriff.selectedOptions.length === 0) &&
               (bug.selectedOptions.length === 0));
     }
 
@@ -373,13 +346,13 @@ tr.exportTo('cp', () => {
       label: 'Report',
       selectedOptions: options.reports || [],
     }),
-    sectionId: options => 0,
+    sectionId: options => options.sectionId || tr.b.GUID.allocateSimple(),
     selectedAlertPath: options => undefined,
     selectedAlertsCount: options => 0,
     selectedAlertsCount: options => 0,
     sheriff: options => cp.MenuInput.buildState({
-      label: 'Sheriff',
-      options: SHERIFFS,
+      label: 'Sheriff (loading)',
+      options: RECOMMENDED_SHERIFFS,
       selectedOptions: options.sheriffs || [],
       recommended: {options: RECOMMENDED_SHERIFFS},
     }),
@@ -419,6 +392,8 @@ tr.exportTo('cp', () => {
       },
 
     authChange: statePath => async(dispatch, getState) => {
+      AlertsSection.actions.loadReportNames(statePath)(dispatch, getState);
+      AlertsSection.actions.loadSheriffs(statePath)(dispatch, getState);
     },
 
     toggleRecentlyModifiedBugs: statePath => async(dispatch, getState) => {
@@ -499,8 +474,22 @@ tr.exportTo('cp', () => {
       }));
     },
 
+    loadSheriffs: statePath => async(dispatch, getState) => {
+      let sheriffs = await new cp.SheriffsRequest().response;
+      const rootState = getState();
+      const teamFilter = cp.TeamFilter.get(rootState.teamName);
+      sheriffs = await teamFilter.sheriffNames(sheriffs);
+      dispatch({
+        type: AlertsSection.reducers.receiveSheriffs.name,
+        statePath,
+        sheriffs,
+      });
+      dispatch(cp.MenuInput.actions.focus(statePath + '.sheriff'));
+    },
+
     connected: statePath => async(dispatch, getState) => {
       AlertsSection.actions.loadReportNames(statePath)(dispatch, getState);
+      AlertsSection.actions.loadSheriffs(statePath)(dispatch, getState);
       const recentlyModifiedBugs = localStorage.getItem('recentlyModifiedBugs');
       if (recentlyModifiedBugs) {
         dispatch({
@@ -510,6 +499,7 @@ tr.exportTo('cp', () => {
         });
       }
       const state = Polymer.Path.get(getState(), statePath);
+      if (!state) return;
       if (state.sheriff.selectedOptions.length > 0 ||
           state.bug.selectedOptions.length > 0 ||
           state.report.selectedOptions.length > 0) {
@@ -838,6 +828,16 @@ tr.exportTo('cp', () => {
   };
 
   AlertsSection.reducers = {
+    receiveSheriffs: (state, {sheriffs}, rootState) => {
+      const sheriff = cp.MenuInput.buildState({
+        label: `Sheriff (${sheriffs.length})`,
+        options: sheriffs,
+        selectedOptions: state.sheriff ? state.sheriff.selectedOptions : [],
+        recommended: {options: RECOMMENDED_SHERIFFS},
+      });
+      return {...state, sheriff};
+    },
+
     selectAlert: (state, action, rootState) => {
       if (state.areAlertGroupsPlaceholders) return state;
       const alertPath =
@@ -1358,9 +1358,12 @@ tr.exportTo('cp', () => {
 
   AlertsSection.isEmpty = state => (
     state &&
-    (!state.sheriff || (state.sheriff.selectedOptions.length === 0)) &&
-    (!state.bug || (state.bug.selectedOptions.length === 0)) &&
-    (!state.report || (state.report.selectedOptions.length === 0)));
+    (!state.sheriff || !state.sheriff.selectedOptions ||
+     (state.sheriff.selectedOptions.length === 0)) &&
+    (!state.bug || !state.bug.selectedOptions ||
+     (state.bug.selectedOptions.length === 0)) &&
+    (!state.report || !state.report.selectedOptions ||
+     (state.report.selectedOptions.length === 0)));
 
   AlertsSection.matchesOptions = (state, options) => {
     if (!tr.b.setsEqual(new Set(options.reports),

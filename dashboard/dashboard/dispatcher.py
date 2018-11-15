@@ -54,6 +54,7 @@ from dashboard import update_dashboard_stats
 from dashboard import update_test_suite_descriptors
 from dashboard import update_test_suites
 from dashboard.api import alerts as api_alerts
+from dashboard.api import sheriffs
 from dashboard.api import bugs
 from dashboard.api import describe
 from dashboard.api import list_timeseries
@@ -73,6 +74,7 @@ _URL_MAPPING = [
     ('/add_point_queue', add_point_queue.AddPointQueueHandler),
     ('/alerts', alerts.AlertsHandler),
     (r'/api/alerts', api_alerts.AlertsHandler),
+    (r'/api/sheriffs', sheriffs.SheriffsHandler),
     (r'/api/alerts/(.*)', api_alerts.AlertsHandler),
     (r'/api/bugs/(.*)', bugs.BugsHandler),
     (r'/api/describe', describe.DescribeHandler),
