@@ -10,7 +10,6 @@ import {
 import Range from './range.js';
 import ResultChannelSender from './result-channel-sender.js';
 
-// TODO move to separate file.
 async function* raceAllPromises(promises) {
   promises = promises.map((p, id) => {
     const replacement = p.then(result => {
@@ -26,7 +25,6 @@ async function* raceAllPromises(promises) {
   }
 }
 
-// TODO move this to an ES6 module and share with the page.
 function normalize(table, columnNames) {
   return table.map(row => {
     const datum = {};
@@ -76,7 +74,6 @@ function findLowIndexInSortedArray(ary, mapFn, loVal) {
   return hitPos !== -1 ? hitPos : low;
 }
 
-// TODO move this to an ES6 module
 function mergeObjectArrays(key, merged, ...arrays) {
   for (const objects of arrays) {
     for (const obj of objects) {
@@ -99,13 +96,18 @@ function mergeObjectArrays(key, merged, ...arrays) {
 
 class TimeseriesSlice {
   constructor(options) {
-    this.columns = options.columns;
-    this.revisionRange = options.revisionRange;
-    this.testSuite = options.testSuite;
-    this.measurement = options.measurement;
     this.bot = options.bot;
-    this.testCase = options.testCase;
     this.buildType = options.buildType;
+    this.columns = options.columns;
+    this.headers = new Headers(options.headers);
+    this.headers.delete('content-type');
+    this.measurement = options.measurement;
+    this.method = options.method;
+    this.revisionRange = options.revisionRange;
+    this.testCase = options.testCase;
+    this.testSuite = options.testSuite;
+    this.url = options.url;
+
     this.responsePromise_ = undefined;
   }
 
@@ -123,7 +125,34 @@ class TimeseriesSlice {
   }
 
   async fetch_() {
-    // TODO use TimeseriesRequest?
+    // TODO Use TimeseriesRequest when it moves to an es6 module.
+    const columns = [...this.columns];
+    const body = new FormData();
+    body.set('test_suite', this.testSuite);
+    body.set('measurement', this.measurement);
+    body.set('bot', this.bot);
+    body.set('columns', columns.join(','));
+    if (this.buildType) body.set('build_type', this.buildType);
+    if (this.testCase) body.set('test_case', this.testCase);
+    if (this.revisionRange.min) {
+      body.set('min_revision', this.revisionRange.min);
+    }
+    if (this.revisionRange.max < Number.MAX_SAFE_INTEGER) {
+      body.set('max_revision', this.revisionRange.max);
+    }
+    const response = await fetch(this.url, {
+      method: this.method,
+      headers: this.headers,
+      body,
+    });
+    if (!response.ok) {
+      return {};
+    }
+    const responseJson = await response.json();
+    if (responseJson.data) {
+      responseJson.data = normalize(responseJson.data, columns);
+    }
+    return responseJson;
   }
 }
 
@@ -156,6 +185,8 @@ export default class TimeseriesCacheRequest extends CacheRequestBase {
     this.bot_ = this.body_.get('bot') || '';
     this.testCase_ = this.body_.get('test_case') || '';
     this.buildType_ = this.body_.get('build_type') || '';
+
+    this.databaseName_ = undefined;
   }
 
   async sendResults_() {
@@ -164,6 +195,7 @@ export default class TimeseriesCacheRequest extends CacheRequestBase {
       new URLSearchParams(this.body_);
     const sender = new ResultChannelSender(channelName);
     await sender.send(this.generateResults());
+    this.onResponded();
   }
 
   respond() {
@@ -172,13 +204,16 @@ export default class TimeseriesCacheRequest extends CacheRequestBase {
   }
 
   get databaseName() {
-    return TimeseriesCacheRequest.databaseName({
-      testSuite: this.testSuite_,
-      measurement: this.measurement_,
-      bot: this.bot_,
-      testCase: this.testCase_,
-      buildType: this.buildType_,
-    });
+    if (!this.databaseName_) {
+      this.databaseName_ = TimeseriesCacheRequest.databaseName({
+        testSuite: this.testSuite_,
+        measurement: this.measurement_,
+        bot: this.bot_,
+        testCase: this.testCase_,
+        buildType: this.buildType_,
+      });
+    }
+    return this.databaseName_;
   }
 
   get databaseVersion() {
@@ -193,10 +228,82 @@ export default class TimeseriesCacheRequest extends CacheRequestBase {
     }
   }
 
+  get slicesPromise() {
+    if (!this.slicesPromise_) this.slicesPromise_ = this.getSlices_();
+    return this.slicesPromise_;
+  }
+
+  get cacheResultPromise() {
+    if (!this.cacheResultPromise_) {
+      this.cacheResultPromise_ = this.getCacheResult_();
+    }
+    return this.cacheResultPromise_;
+  }
+
+  async getCacheResult_() {
+    await this.parseRequestPromise;
+    return await this.readDatabase_();
+  }
+
+  createSlice_(columns, revisionRange) {
+    return new TimeseriesSlice({
+      bot: this.bot_,
+      buildType: this.buildType_,
+      columns,
+      headers: this.fetchEvent.request.headers,
+      measurement: this.measurement_,
+      method: this.fetchEvent.request.method,
+      revisionRange,
+      testCase: this.testCase_,
+      testSuite: this.testSuite_,
+      url: this.fetchEvent.request.url,
+    });
+  }
+
+  async getSlices_() {
+    const cacheResult = await this.cacheResultPromise;
+    let availableRangeByCol = new Map();
+    if (cacheResult && cacheResult.data) {
+      availableRangeByCol = cacheResult.availableRangeByCol;
+    }
+
+    // If a col is available for revisionRange_, then don't fetch it.
+    const columns = new Set(this.columns_);
+    for (const col of columns) {
+      if (col === 'revision') continue;
+      const availableRange = availableRangeByCol.get(col);
+      if (!availableRange) continue;
+      if (this.revisionRange_.duration === availableRange.duration) {
+        columns.delete(col);
+      }
+    }
+
+    // If all cols but revisions are available for the request range, then
+    // don't fetch from the network.
+    if (columns.size === 1) return new Set();
+
+    // If all cols are available for some subrange, then don't fetch that
+    // range.
+    let availableRange = this.revisionRange_;
+    for (const col of columns) {
+      if (col === 'revision') continue;
+      const availableForCol = availableRangeByCol.get(col);
+      if (!availableForCol) {
+        availableRange = new Range();
+        break;
+      }
+      availableRange = availableRange.findIntersection(availableForCol);
+    }
+    const missingRanges = Range.findDifference(
+        this.revisionRange_, availableRange);
+
+    return new Set(missingRanges.map(revisionRange =>
+      this.createSlice_(columns, revisionRange)));
+  }
+
   get generateResults() {
     return async function* () {
-      await this.parseRequestPromise;
-      const cacheResult = await this.readDatabase_();
+      const cacheResult = {...await this.cacheResultPromise};
       let finalResult = cacheResult;
       let availableRangeByCol = new Map();
       let mergedData = [];
@@ -207,92 +314,58 @@ export default class TimeseriesCacheRequest extends CacheRequestBase {
         yield cacheResult;
       }
 
-      // Sometimes the client will request the same data in multiple different ways:
-      // the minimap and the main chart both request XY data for the brushed
-      // revision range, but the minimap also wants XY data outside the brushed
-      // revision range, and the main chart also wants ANNOTATIONS data inside
-      // the brushed revision range. We should only request the XY data inside
-      // the brushed revision range from the server once, and share the data
-      // between both TimeseriesCacheRequests.
+      const slices = await this.slicesPromise;
+      const matchingSlices = new Set();
+      await this.findInProgressRequest(async other => {
+        if (other.databaseName_ !== this.databaseName_) return;
 
-      // TODO if there are any IN_PROGRESS requests for parts of this data
-      // (columns or ranges), then don't request those parts here, but add those
-      // requests' async generators to this networkPromises, and filter by
-      // revision range before merging into mergedData.
+        const otherSlices = await other.slicesPromise;
+        for (const slice of slices) {
+          for (const otherSlice of otherSlices) {
+            const intersection = slice.revisionRange.findIntersection(
+                otherSlice.revisionRange);
+            if (intersection.duration < slice.revisionRange.duration) {
+              continue;
+            }
 
-      // If a col is available for revisionRange_, then don't fetch it.
-      const columns = [...this.columns_];
-      for (let ci = 0; ci < columns.length; ++ci) {
-        const col = columns[ci];
-        if (col === 'revision') continue;
-        const availableRange = availableRangeByCol.get(col);
-        if (!availableRange) continue;
-        if (this.revisionRange_.duration === availableRange.duration) {
-          columns.splice(ci, 1);
-          --ci;
+            for (const col of slice.columns) {
+              if (col === 'revision') continue;
+              if (otherSlice.columns.has(col)) {
+                // If a col is already being fetched by an otherSlice, then
+                // don't fetch it.
+                slice.columns.delete(col);
+                matchingSlices.add(otherSlice);
+              }
+            }
+            // If all cols are already being fetched by an otherSlice, then
+            // don't fetch it.
+            if (slice.columns.size === 1) {
+              slices.delete(slice);
+            }
+          }
         }
+      });
+
+      const sliceResponses = [];
+      for (const slice of slices) sliceResponses.push(slice.responsePromise);
+      for (const slice of matchingSlices) {
+        sliceResponses.push(slice.responsePromise);
       }
 
-      // If all cols but revisions are available for the request range, then
-      // don't fetch from the network.
-      if (columns.length === 1) return;
-
-      // If all cols are available for some subrange, then don't fetch that
-      // range.
-      let availableRange = this.revisionRange_;
-      for (const col of columns) {
-        if (col === 'revision') continue;
-        const availableForCol = availableRangeByCol.get(col);
-        if (!availableForCol) {
-          availableRange = new Range();
-          break;
-        }
-        availableRange = availableRange.findIntersection(availableForCol);
-      }
-      const missingRanges = Range.findDifference(
-          this.revisionRange_, availableRange);
-
-      const networkPromises = missingRanges.map((range, index) =>
-        this.readNetwork_(range, columns));
-      // TODO refactor networkPromises into TimeseriesSlices.
-      // TODO merge/split these Slices with those from other requests.
-      for await (const result of raceAllPromises(networkPromises)) {
+      for await (const result of raceAllPromises(sliceResponses)) {
         if (!result || result.error || !result.data || !result.data.length) {
           continue;
         }
-        mergeObjectArrays('revision', mergedData, result.data);
+        mergeObjectArrays('revision', mergedData, result.data.filter(d => (
+          d.revision >= this.revisionRange_.min &&
+          d.revision <= this.revisionRange_.max)));
         finalResult = {...result, data: mergedData};
         yield finalResult;
       }
-      this.scheduleWrite(finalResult);
+      if (finalResult.data && finalResult.data.length) {
+        this.scheduleWrite(finalResult);
+      }
     };
-  }
-
-  async readNetwork_(range, columns) {
-    const params = {
-      test_suite: this.testSuite_,
-      measurement: this.measurement_,
-      bot: this.bot_,
-      build_type: this.buildType_,
-      columns: columns.join(','),
-    };
-    if (range.min) params.min_revision = range.min;
-    if (range.max < Number.MAX_SAFE_INTEGER) params.max_revision = range.max;
-    if (this.testCase_) params.test_case = this.testCase_;
-    let url = new URL(this.fetchEvent.request.url);
-    url = url.origin + url.pathname + '?' + new URLSearchParams(params);
-    const response = await fetch(url, {
-      method: this.fetchEvent.request.method,
-      headers: this.fetchEvent.request.headers,
-    });
-    if (!response.ok) {
-      return {};
-    }
-    const responseJson = await response.json();
-    if (responseJson.data) {
-      responseJson.data = normalize(responseJson.data, columns);
-    }
-    return responseJson;
   }
 
   async readDatabase_() {

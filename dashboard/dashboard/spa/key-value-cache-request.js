@@ -57,15 +57,15 @@ export default class KeyValueCacheRequest extends CacheRequestBase {
 
   async getResponse() {
     const key = await this.databaseKeyPromise;
-    const otherRequest = await this.findInProgressRequest(async other =>
+    const other = await this.findInProgressRequest(async other =>
       ((await other.databaseKeyPromise) === key));
-    if (otherRequest) {
+    if (other) {
       // Be sure to call onComplete() to remove `this` from IN_PROGRESS_REQUESTS
-      // so that `otherRequest.getResponse()` doesn't await
+      // so that `other.getResponse()` doesn't await
       // `this.getResponse()`, which would cause both of these requests to
       // deadlock.
       this.onComplete();
-      return await otherRequest.responsePromise;
+      return await other.responsePromise;
     }
 
     const entry = await this.readDatabase_(key);

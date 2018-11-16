@@ -43,6 +43,7 @@ export default class ReportCacheRequest extends CacheRequestBase {
     });
     const sender = new ResultChannelSender(channelName);
     await sender.send(this.generateResults());
+    this.onResponded();
   }
 
   respond() {

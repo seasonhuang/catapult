@@ -160,7 +160,7 @@ class TimeseriesQuery(object):
   @ndb.tasklet
   def _FetchTests(self):
     with timing.WallTimeLogger('fetch_tests'):
-      tests = yield [key.get_async() for key in self._test_metadata_keys]
+      tests = yield [key.get_async() for key in self._test_keys]
     tests = [test for test in tests if test]
     if not tests:
       raise api_request_handler.NotFoundError
