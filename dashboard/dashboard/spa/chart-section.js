@@ -257,7 +257,8 @@ tr.exportTo('cp', () => {
     connected: statePath => async(dispatch, getState) => {
       const state = Polymer.Path.get(getState(), statePath);
       ChartSection.actions.loadTestSuites(statePath)(dispatch, getState);
-      if (state.testSuite.selectedOptions.length) {
+      if (state && state.testSuite && state.testSuite.selectedOptions &&
+          state.testSuite.selectedOptions.length) {
         await ChartSection.actions.describeTestSuites(statePath)(
             dispatch, getState);
         ChartSection.actions.maybeLoadTimeseries(statePath)(dispatch, getState);
@@ -1185,6 +1186,7 @@ tr.exportTo('cp', () => {
         testCasesAggregated: state.testCase.isAggregated,
         statistics: state.statistic.selectedOptions,
       },
+      isLinked: state.isLinked,
       isExpanded: state.isExpanded,
       title: state.title,
       minRevision: state.minRevision,
@@ -1302,6 +1304,22 @@ tr.exportTo('cp', () => {
         !state.measurement ||
         !state.bot ||
         !state.testCase) {
+      return false;
+    }
+    if (options.mode !== undefined &&
+        options.mode !== state.mode) {
+      return false;
+    }
+    if (options.isLinked !== undefined &&
+        options.isLinked !== state.isLinked) {
+      return false;
+    }
+    if (options.zeroYAxis !== undefined &&
+        options.zeroYAxis !== state.zeroYAxis) {
+      return false;
+    }
+    if (options.fixedXAxis !== undefined &&
+        options.fixedXAxis !== state.fixedXAxis) {
       return false;
     }
     if (options.parameters) {

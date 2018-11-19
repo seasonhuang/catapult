@@ -57,6 +57,11 @@ export default class KeyValueCacheRequest extends CacheRequestBase {
 
   async getResponse() {
     const key = await this.databaseKeyPromise;
+    const entry = await this.readDatabase_(key);
+    if (entry && (new Date(entry.expiration) > new Date())) {
+      return entry.value;
+    }
+
     const other = await this.findInProgressRequest(async other =>
       ((await other.databaseKeyPromise) === key));
     if (other) {
@@ -65,12 +70,8 @@ export default class KeyValueCacheRequest extends CacheRequestBase {
       // `this.getResponse()`, which would cause both of these requests to
       // deadlock.
       this.onComplete();
-      return await other.responsePromise;
-    }
 
-    const entry = await this.readDatabase_(key);
-    if (entry && (new Date(entry.expiration) > new Date())) {
-      return entry.value;
+      return await other.responsePromise;
     }
 
     const response = await fetch(this.fetchEvent.request);
