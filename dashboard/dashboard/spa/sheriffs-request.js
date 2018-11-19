@@ -13,6 +13,10 @@ tr.exportTo('cp', () => {
     get url_() {
       return '/api/sheriffs';
     }
+
+    async localhostResponse_() {
+      return ['Chromium Perf Sheriff'];
+    }
   }
 
   return {SheriffsRequest};

@@ -19,6 +19,12 @@ tr.exportTo('cp', () => {
         return {...info, modified: new Date(info.modified)};
       });
     }
+
+    async localhostResponse_() {
+      return [
+        {name: cp.ReportSection.DEFAULT_NAME, id: 0, modified: 0},
+      ];
+    }
   }
 
   return {ReportNamesRequest};
