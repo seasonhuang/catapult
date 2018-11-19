@@ -35,6 +35,7 @@ tr.exportTo('cp', () => {
           this.channelName);
       const response = await this.response;
       if (response) yield response;
+      if (window.IS_DEBUG) return;
       for await (const update of receiver) {
         yield this.postProcess_(update, true);
       }

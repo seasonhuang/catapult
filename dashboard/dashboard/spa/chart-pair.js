@@ -232,16 +232,11 @@ tr.exportTo('cp', () => {
       },
 
     toggleLinked: (statePath, linkedStatePath) => async(dispatch, getState) => {
-      const linkedState = Polymer.Path.get(getState(), linkedStatePath);
-      dispatch(Redux.UPDATE(statePath, {
-        isLinked: true,
-        cursorRevision: linkedState.linkedCursorRevision,
-        minRevision: linkedState.linkedMinRevision,
-        maxRevision: linkedState.linkedMaxRevision,
-        mode: linkedState.mode,
-        zeroYAxis: linkedState.linkedZeroYAxis,
-        fixedXAxis: linkedState.linkedFixedXAxis,
-      }));
+      dispatch({
+        type: ChartPair.reducers.toggleLinked.name,
+        statePath,
+        linkedStatePath,
+      });
       ChartPair.actions.load(statePath)(dispatch, getState);
     },
 
@@ -407,6 +402,23 @@ tr.exportTo('cp', () => {
   };
 
   ChartPair.reducers = {
+    toggleLinked: (state, {linkedStatePath}, rootState) => {
+      state = {...state, isLinked: !state.isLinked};
+      if (state.isLinked) {
+        const linkedState = Polymer.Path.get(rootState, linkedStatePath);
+        state = {
+          ...state,
+          cursorRevision: linkedState.linkedCursorRevision,
+          minRevision: linkedState.linkedMinRevision,
+          maxRevision: linkedState.linkedMaxRevision,
+          mode: linkedState.mode,
+          zeroYAxis: linkedState.linkedZeroYAxis,
+          fixedXAxis: linkedState.linkedFixedXAxis,
+        };
+      }
+      return state;
+    },
+
     receiveTestSuites: (state, action, rootState) => {
       if (rootState.userEmail &&
           (action.options.length < state.testSuite.options.length)) {
