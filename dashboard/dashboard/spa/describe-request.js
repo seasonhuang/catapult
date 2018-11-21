@@ -53,11 +53,11 @@ tr.exportTo('cp', () => {
     }
 
     static mergeDescriptor(merged, descriptor) {
-      for (const bot of descriptor.bots) merged.bots.add(bot);
-      for (const measurement of descriptor.measurements) {
+      for (const bot of (descriptor.bots || [])) merged.bots.add(bot);
+      for (const measurement of (descriptor.measurements || [])) {
         merged.measurements.add(measurement);
       }
-      for (const testCase of descriptor.cases) {
+      for (const testCase of (descriptor.cases || [])) {
         merged.testCases.add(testCase);
       }
       for (const [tag, cases] of Object.entries(descriptor.caseTags || {})) {
