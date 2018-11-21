@@ -30,7 +30,7 @@ tr.exportTo('cp', () => {
           'startup',
           'size',
         ],
-        bots: ['master:aaa', 'master:bbb', 'master:ccc'],
+        bots: ['master:bot0', 'master:bot1', 'master:bot2'],
         cases: [
           'browse:media:facebook_photos',
           'browse:media:imgur',
