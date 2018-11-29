@@ -425,6 +425,7 @@ tr.exportTo('cp', () => {
             });
 
         if (data.length === 0) return state;
+        if (!timeserieses.length || !timeserieses[0].length) return state;
 
         let unit = timeserieses[0][0].unit;
         if (state.mode === 'delta') {
