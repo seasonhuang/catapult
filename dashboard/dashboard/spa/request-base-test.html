@@ -16,11 +16,11 @@ suite('RequestBase', function() {
   let originalAuthorizationHeaders;
   setup(() => {
     originalFetch = window.fetch;
-    originalAuthorizationHeaders = cp.authorizationHeaders;
+    originalAuthorizationHeaders = window.getAuthorizationHeaders;
   });
   teardown(() => {
     window.fetch = originalFetch;
-    cp.authorizationHeaders = originalAuthorizationHeaders;
+    window.getAuthorizationHeaders = originalAuthorizationHeaders;
   });
 
   class TestRequest extends cp.RequestBase {
@@ -33,10 +33,10 @@ suite('RequestBase', function() {
     }
   }
 
-  test('authorizationHeaders', async() => {
-    cp.authorizationHeaders = async() => [
-      ['Authorization', 'test Authorization'],
-    ];
+  test('getAuthorizationHeaders', async() => {
+    window.getAuthorizationHeaders = async() => {
+      return {Authorization: 'test Authorization'};
+    };
     window.fetch = async(url, options) => {
       assert.strictEqual('test Authorization',
           options.headers.get('Authorization'));

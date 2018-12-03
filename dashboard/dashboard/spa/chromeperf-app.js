@@ -18,8 +18,6 @@ tr.exportTo('cp', () => {
     'system_health.memory_mobile',
   ];
 
-  const CLIENT_ID =
-    '62121018386-rhk28ad5lbqheinh05fgau3shotl2t6c.apps.googleusercontent.com';
 
   class RecentBugsRequest extends cp.RequestBase {
     constructor() {
@@ -54,23 +52,10 @@ tr.exportTo('cp', () => {
   }
 
   class ChromeperfApp extends cp.ElementBase {
-    get clientId() {
-      return CLIENT_ID;
-    }
-
     async ready() {
       super.ready();
       const routeParams = new URLSearchParams(this.route.path);
-      let authParams;
-      if (this.isProduction) {
-        authParams = {
-          client_id: this.clientId,
-          cookie_policy: '',
-          scope: 'email',
-          hosted_domain: '',
-        };
-      }
-      this.dispatch('ready', this.statePath, routeParams, authParams);
+      this.dispatch('ready', this.statePath, routeParams);
     }
 
     escapedUrl_(path) {
@@ -89,12 +74,8 @@ tr.exportTo('cp', () => {
       this.route = {prefix: '', path: this.reduxRoutePath};
     }
 
-    async onSignin_(event) {
-      await this.dispatch('onSignin', this.statePath);
-    }
-
-    async onSignout_(event) {
-      await this.dispatch('onSignout', this.statePath);
+    async onUserUpdate_() {
+      await this.dispatch('userUpdate', this.statePath);
     }
 
     async onReopenClosedAlerts_(event) {
@@ -105,9 +86,10 @@ tr.exportTo('cp', () => {
       await this.dispatch('reopenClosedChart', this.statePath);
     }
 
-    requireSignIn_(event) {
+    async requireSignIn_(event) {
       if (this.userEmail || !this.isProduction) return;
-      this.shadowRoot.querySelector('google-signin').signIn();
+      const auth = await window.getAuthInstanceAsync();
+      await auth.signIn();
     }
 
     hideReportSection_(event) {
@@ -197,7 +179,7 @@ tr.exportTo('cp', () => {
   ];
 
   ChromeperfApp.actions = {
-    ready: (statePath, routeParams, authParams) =>
+    ready: (statePath, routeParams) =>
       async(dispatch, getState) => {
         requestIdleCallback(async() => {
           cp.ReadTestSuites();
@@ -222,15 +204,12 @@ tr.exportTo('cp', () => {
           statePath,
         });
 
-        if (authParams) {
-          // Wait for gapi to load and get an Authorization token.
-          // gapi.auth2.init is then-able, but not await-able, so wrap it in a
-          // real Promise.
-          await new Promise(resolve => gapi.load('auth2', () =>
-            gapi.auth2.init(authParams).then(resolve, resolve)));
+        if (window.IS_PRODUCTION) {
+          // Wait for gapi.auth2 to load and get an Authorization token.
+          await window.getAuthInstanceAsync();
         }
 
-        // Now, if the user is signed in, we have authorizationHeaders. Try to
+        // Now, if the user is signed in, we can get auth headers. Try to
         // restore session state, which might include internal data.
         await ChromeperfApp.actions.restoreFromRoute(
             statePath, routeParams)(dispatch, getState);
@@ -290,26 +269,22 @@ tr.exportTo('cp', () => {
       });
     },
 
-    onSignin: statePath => async(dispatch, getState) => {
-      const user = gapi.auth2.getAuthInstance().currentUser.get();
-      const response = user.getAuthResponse();
+    userUpdate: statePath => async(dispatch, getState) => {
+      const profile = await window.getUserProfileAsync();
       dispatch(Redux.UPDATE('', {
-        userEmail: user.getBasicProfile().getEmail(),
+        userEmail: profile ? profile.getEmail() : '',
       }));
-      await Promise.all([
-        cp.ChromeperfApp.actions.getRecentBugs()(dispatch, getState),
-        cp.ReadTestSuites(),
-      ]);
+      cp.ReadTestSuites();
+      if (profile) {
+        cp.ChromeperfApp.actions.getRecentBugs()(dispatch, getState);
+      }
     },
 
     getRecentBugs: () => async(dispatch, getState) => {
       const bugs = await new RecentBugsRequest().response;
-      const recentPerformanceBugs = bugs.map(cp.AlertsSection.transformBug);
+      const recentPerformanceBugs = bugs && bugs.map(
+          cp.AlertsSection.transformBug);
       dispatch(Redux.UPDATE('', {recentPerformanceBugs}));
-    },
-
-    onSignout: () => async(dispatch, getState) => {
-      dispatch(Redux.UPDATE('', {userEmail: ''}));
     },
 
     restoreSessionState: (statePath, sessionId) =>

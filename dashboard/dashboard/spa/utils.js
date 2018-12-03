@@ -457,34 +457,6 @@ tr.exportTo('cp', () => {
   }
 
   /**
-   * Wrap Google Sign-in client library to build the Authorization header, if
-   * one is available. Automatically reloads the token if necessary.
-   */
-  async function authorizationHeaders() {
-    if (window.gapi === undefined) return [];
-    if (gapi.auth2 === undefined) return [];
-
-    const auth = gapi.auth2.getAuthInstance();
-    if (!auth) return [];
-    const user = auth.currentUser.get();
-    let response = user.getAuthResponse();
-
-    if (response.expires_at === undefined) {
-      // The user is not signed in.
-      return [];
-    }
-
-    if (response.expires_at < new Date()) {
-      // The token has expired, so reload it.
-      response = await user.reloadAuthResponse();
-    }
-
-    return [
-      ['Authorization', response.token_type + ' ' + response.access_token],
-    ];
-  }
-
-  /**
    * Generate pretty colors!
    * http://basecase.org/env/on-rainbows
    * https://mycarta.wordpress.com/2012/10/06/the-rainbow-is-deadlong-live-the-rainbow-part-3/
@@ -587,7 +559,6 @@ tr.exportTo('cp', () => {
   return {
     afterRender,
     animationFrame,
-    authorizationHeaders,
     BatchIterator,
     buildProperties,
     buildState,

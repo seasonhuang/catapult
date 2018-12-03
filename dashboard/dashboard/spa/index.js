@@ -4,6 +4,9 @@
 */
 'use strict';
 
+window.AUTH_CLIENT_ID =
+  '62121018386-rhk28ad5lbqheinh05fgau3shotl2t6c.apps.googleusercontent.com';
+
 // When true, state is recursively frozen so that improper property setting
 // causes an error to be thrown. Freezing significantly impacts performance,
 // so set to false in order to measure performance on localhost.

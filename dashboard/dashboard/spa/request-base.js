@@ -46,8 +46,8 @@ tr.exportTo('cp', () => {
     }
 
     async addAuthorizationHeaders_() {
-      const headers = await cp.authorizationHeaders();
-      for (const [name, value] of headers) {
+      const headers = await window.getAuthorizationHeaders();
+      for (const [name, value] of Object.entries(headers)) {
         this.headers_.set(name, value);
       }
     }

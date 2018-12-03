@@ -7,7 +7,8 @@ found in the LICENSE file.
 
 <link rel="import" href="/bower_components/app-route/app-location.html">
 <link rel="import" href="/bower_components/app-route/app-route.html">
-<link rel="import" href="/bower_components/google-signin/google-signin.html">
+<link rel="import" href="/bower_components/chopsui/chops-signin.html">
+<link rel="import" href="/bower_components/chopsui/chops-signin-aware.html">
 <link rel="import" href="/dashboard/spa/alerts-section.html">
 <link rel="import" href="/dashboard/spa/chart-section.html">
 <link rel="import" href="/dashboard/spa/cp-icons.html">
@@ -35,7 +36,6 @@ found in the LICENSE file.
 
       #title {
         font-size: large;
-        line-height: 27px; /* match height of google-signin */
         padding: 8px;
         text-decoration: none;
       }
@@ -51,11 +51,6 @@ found in the LICENSE file.
 
       #nav a {
         color: var(--primary-color-dark);
-      }
-
-      google-signin {
-        margin: 0;
-        padding: 8px;
       }
 
       report-section,
@@ -88,12 +83,6 @@ found in the LICENSE file.
         flex-grow: 1;
       }
 
-      #please_signin {
-        color: var(--error-color);
-        font-size: larger;
-        font-weight: bold;
-      }
-
       cp-toast {
         border-radius: 24px;
         cursor: pointer;
@@ -103,6 +92,10 @@ found in the LICENSE file.
 
       cp-toast iron-icon {
         color: var(--background-color, white);
+      }
+
+      chops-signin {
+        margin: 4px;
       }
 
       @media (max-width: 1100px) {
@@ -191,22 +184,9 @@ found in the LICENSE file.
         </a>
 
         <template is="dom-if" if="[[isProduction]]">
-          <template is="dom-if" if="[[!userEmail]]">
-            <span id="please_signin">
-              Some features require signing in:
-            </span>
-          </template>
-          [[userEmail]]
-
-          <google-signin
-              id="signin"
-              client-id="[[clientId]]"
-              height="short"
-              theme="dark"
-              scopes="email"
-              on-google-signin-success="onSignin_"
-              on-google-signed-out="onSignout_">
-          </google-signin>
+          <chops-signin></chops-signin>
+          <chops-signin-aware on-user-update="onUserUpdate_">
+          </chops-signin-aware>
         </template>
       </div>
     </template>
