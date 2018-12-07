@@ -14,11 +14,13 @@
 //   window.addEventListener('user-update', ...);
 //   const headers = await window.getAuthorizationHeaders();
 //
-// TODO(benjhayden): Remove the namespace and export getAuthorizationHeaders()
-// and getUserProfile*() when all clients import this as an ES6 module.
-(() => {
+// TODO(benjhayden): Remove the namespace and export functions when all clients
+// import this as an ES6 module.
+// TODO(benjhayden): Use async/await when all clients that need to support IE
+// use a compiler like babel.
+(function() {
   let resolveAuthInitializedPromise;
-  const authInitializedPromise = new Promise(resolve => {
+  const authInitializedPromise = new Promise(function(resolve) {
     resolveAuthInitializedPromise = resolve;
   });
 
@@ -28,9 +30,8 @@
   window[callbackName] = function() {
     gapi.load('auth2', onAuthLoaded);
     delete window[callbackName];
-    document.body.removeChild(gapiScript);
   };
-  document.body.appendChild(gapiScript);
+  document.head.appendChild(gapiScript);
 
   function onAuthLoaded() {
     if (!window.gapi || !gapi.auth2) return;
@@ -38,8 +39,9 @@
       client_id: window.AUTH_CLIENT_ID,
       scope: 'email',
     });
-    auth.currentUser.listen(user => window.dispatchEvent(
-        new CustomEvent('user-update', {detail: {user}})));
+    auth.currentUser.listen(function(user) {
+      window.dispatchEvent(new CustomEvent('user-update', {detail: {user}}));
+    });
     auth.then(
       function onFulfilled() {
         resolveAuthInitializedPromise();
@@ -65,15 +67,15 @@
       this.img_.style.borderRadius = '50%';
       this.img_.style.overflow = 'hidden';
       this.render_();
-      this.addEventListener('click', e => this.onClick_(e));
-      window.addEventListener('user-update', e => this.onUserUpdate_(e));
+      this.addEventListener('click', this.onClick_.bind(this));
+      window.addEventListener('user-update', this.onUserUpdate_.bind(this));
     }
 
     render_() {
       while (this.children.length) this.removeChild(this.children[0]);
       const profile = getUserProfileSync();
       if (!profile) {
-        this.title = 'Signin';
+        this.title = 'Signin with Google';
         this.appendChild(this.icon_);
         this.style.fill = 'red';
         return;
@@ -110,50 +112,56 @@
       this.render_();
     }
 
-    async onClick_() {
-      const auth = await window.getAuthInstanceAsync();
-      if (auth.currentUser.get().isSignedIn()) {
-        await auth.signOut();
-      } else {
-        await auth.signIn();
-      }
+    onClick_() {
+      return authInitializedPromise.then(function() {
+        const auth = gapi.auth2.getAuthInstance();
+        if (auth.currentUser.get().isSignedIn()) {
+          return auth.signOut();
+        } else {
+          return auth.signIn();
+        }
+      });
     }
   }
 
   customElements.define('chops-signin', ChopsSignin);
 
-  window.getAuthInstanceAsync = async() => {
-    await authInitializedPromise;
-    return gapi.auth2.getAuthInstance();
+  window.getAuthInstanceAsync = function() {
+    return authInitializedPromise.then(function() {
+      return gapi.auth2.getAuthInstance();
+    });
   };
 
-  window.getUserProfileSync = () => {
+  window.getUserProfileSync = function() {
     if (!window.gapi || !gapi.auth2) return undefined;
-    return gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
+    const user = gapi.auth2.getAuthInstance().currentUser.get();
+    if (!user.isSignedIn()) return undefined;
+    return user.getBasicProfile();
   };
 
   // This async version waits for gapi.auth2 to finish initializing before
   // getting the profile.
-  window.getUserProfileAsync = async() => {
-    await authInitializedPromise;
-    return getUserProfileSync();
+  window.getUserProfileAsync = function() {
+    return authInitializedPromise.then(getUserProfileSync);
   };
 
-  window.getAuthorizationHeaders = async() => {
-    await authInitializedPromise;
-    const auth = gapi.auth2.getAuthInstance();
-    if (!auth) return {};
-    const user = auth.currentUser.get();
-    let response = user.getAuthResponse();
-    if (response.expires_at === undefined) {
-      // The user is not signed in.
-      return {};
-    }
-    if (response.expires_at < new Date()) {
-      // The token has expired, so reload it.
-      response = await user.reloadAuthResponse();
-    }
-    if (!response) return {};
-    return {Authorization: response.token_type + ' ' + response.access_token};
+  window.getAuthorizationHeaders = function() {
+    return window.getAuthInstanceAsync().then(function(auth) {
+      if (!auth) return undefined;
+      const user = auth.currentUser.get();
+      const response = user.getAuthResponse();
+      if (response.expires_at === undefined) {
+        // The user is not signed in.
+        return undefined;
+      }
+      if (response.expires_at < new Date()) {
+        // The token has expired, so reload it.
+        return user.reloadAuthResponse();
+      }
+      return response;
+    }).then(function(response) {
+      if (!response) return {};
+      return {Authorization: response.token_type + ' ' + response.access_token};
+    });
   };
 })();
