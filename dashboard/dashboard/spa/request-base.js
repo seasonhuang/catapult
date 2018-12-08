@@ -53,14 +53,14 @@ tr.exportTo('cp', () => {
     }
 
     async fetch_() {
-      await this.addAuthorizationHeaders_();
-
       if (window.IS_DEBUG) {
         // Simulate network latency in order to test loading state e.g. progress
         // bars.
         await cp.timeout(1000);
         return this.postProcess_(await this.localhostResponse_());
       }
+
+      await this.addAuthorizationHeaders_();
 
       const mark = tr.b.Timing.mark('fetch', this.constructor.name);
       const response = await fetch(this.url_, {

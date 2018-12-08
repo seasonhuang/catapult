@@ -16,6 +16,10 @@ tr.exportTo('cp', () => {
       return '/short_uri';
     }
 
+    async localhostResponse_() {
+      return {sid: ''};
+    }
+
     postProcess_(json) {
       return json.sid;
     }

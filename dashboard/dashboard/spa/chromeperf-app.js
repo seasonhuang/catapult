@@ -62,16 +62,17 @@ tr.exportTo('cp', () => {
       return encodeURIComponent(window.location.origin + '#' + path);
     }
 
-    showBottomButtons_(
-        enableNav, showingReportSection, alertsSectionIds, chartSectionIds) {
-      return enableNav && (
-        showingReportSection ||
-        !this.isEmpty_(alertsSectionIds) ||
-        !this.isEmpty_(chartSectionIds));
-    }
-
     observeReduxRoute_() {
       this.route = {prefix: '', path: this.reduxRoutePath};
+    }
+
+    observeAppRoute_() {
+      if (!this.readied) return;
+      if (this.route.path === '') {
+        this.dispatch('reset', this.statePath);
+        return;
+      }
+      // TODO(benjhayden) Restore session?
     }
 
     async onUserUpdate_() {
@@ -162,7 +163,7 @@ tr.exportTo('cp', () => {
     // App-route sets |route|, and redux sets |reduxRoutePath|.
     // ChromeperfApp translates between them.
     // https://stackoverflow.com/questions/41440316
-    reduxRoutePath: options => '',
+    reduxRoutePath: options => '#',
     vulcanizedDate: options => options.vulcanizedDate,
   };
 
@@ -174,6 +175,7 @@ tr.exportTo('cp', () => {
 
   ChromeperfApp.observers = [
     'observeReduxRoute_(reduxRoutePath)',
+    'observeAppRoute_(route)',
     ('observeSections_(showingReportSection, reportSection, ' +
      'alertsSectionsById, chartSectionsById)'),
   ];
@@ -222,7 +224,7 @@ tr.exportTo('cp', () => {
 
         if (window.IS_DEBUG) {
           // In production, this api is only available to chromium members.
-          cp.ChromeperfApp.actions.getRecentBugs()(dispatch, getState);
+          ChromeperfApp.actions.getRecentBugs()(dispatch, getState);
         }
       },
 
@@ -255,7 +257,7 @@ tr.exportTo('cp', () => {
         statePath,
         sectionId,
       });
-      cp.ChromeperfApp.actions.updateLocation(statePath)(dispatch, getState);
+      ChromeperfApp.actions.updateLocation(statePath)(dispatch, getState);
 
       await cp.timeout(5000);
       const state = Polymer.Path.get(getState(), statePath);
@@ -276,7 +278,7 @@ tr.exportTo('cp', () => {
       }));
       cp.ReadTestSuites();
       if (profile) {
-        cp.ChromeperfApp.actions.getRecentBugs()(dispatch, getState);
+        ChromeperfApp.actions.getRecentBugs()(dispatch, getState);
       }
     },
 
@@ -423,9 +425,9 @@ tr.exportTo('cp', () => {
         routeParams.set('nonav', '');
       }
 
-      dispatch(Redux.UPDATE(statePath, {
-        reduxRoutePath: routeParams.toString(),
-      }));
+      // The extra '#' prevents observeAppRoute_ from dispatching reset.
+      const reduxRoutePath = routeParams.toString() || '#';
+      dispatch(Redux.UPDATE(statePath, {reduxRoutePath}));
     },
 
     reopenClosedAlerts: statePath => async(dispatch, getState) => {
@@ -470,7 +472,7 @@ tr.exportTo('cp', () => {
         statePath,
         sectionId,
       });
-      cp.ChromeperfApp.actions.updateLocation(statePath)(dispatch, getState);
+      ChromeperfApp.actions.updateLocation(statePath)(dispatch, getState);
 
       await cp.timeout(5000);
       const state = Polymer.Path.get(getState(), statePath);
@@ -489,7 +491,7 @@ tr.exportTo('cp', () => {
         type: ChromeperfApp.reducers.closeAllCharts.name,
         statePath,
       });
-      cp.ChromeperfApp.actions.updateLocation(statePath)(dispatch, getState);
+      ChromeperfApp.actions.updateLocation(statePath)(dispatch, getState);
     },
 
     reset: statePath => async(dispatch, getState) => {
@@ -497,8 +499,7 @@ tr.exportTo('cp', () => {
         sources: [cp.ReportSection.DEFAULT_NAME]
       })(dispatch, getState);
       ChromeperfApp.actions.reportSectionShowing(
-          statePath, true
-      )(dispatch, getState);
+          statePath, true)(dispatch, getState);
       dispatch({type: ChromeperfApp.reducers.closeAllAlerts.name, statePath});
       ChromeperfApp.actions.closeAllCharts(statePath)(dispatch, getState);
     },
@@ -506,7 +507,7 @@ tr.exportTo('cp', () => {
 
   ChromeperfApp.reducers = {
     ready: (state, action, rootState) => {
-      let vulcanizedDate = '';
+      let vulcanizedDate = 'dev_appserver';
       if (window.VULCANIZED_TIMESTAMP) {
         vulcanizedDate = tr.b.formatDate(new Date(
             VULCANIZED_TIMESTAMP.getTime() - (1000 * 60 * 60 * 7))) + ' PT';
