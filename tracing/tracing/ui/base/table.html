@@ -720,9 +720,12 @@ tr.exportTo('tr.ui.b', function() {
       for (let i = 0; i < this.tableColumns_.length;) {
         const td = this.appendNewElement_(trElement, 'td');
         td.columnIndex = i;
+        td.style.whiteSpace = 'nowrap';
 
         const column = this.tableColumns_[i];
         const value = column.value(rowInfo.userRow);
+        value.style && (value.style.maxWidth = '120px');
+
         const colSpan = column.colSpan ? column.colSpan : 1;
         td.style.colSpan = colSpan;
 
