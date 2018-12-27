@@ -23,7 +23,7 @@ found in the LICENSE file.
         border: 1px solid rgba(0, 0, 0, 0.5);
         box-sizing: border-box;
         margin: 0;
-        padding: 0;
+        padding: 0 10px;
         width: 170px;
       }
       input:focus {
@@ -61,7 +61,7 @@ found in the LICENSE file.
       @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 
-    <input type='text' id='filter'
+    <input type='text' id='filter' placeholder="Search..."
         on-input="filterTextChanged"
         on-keydown="filterKeyDown"
         on-blur="filterBlur"
