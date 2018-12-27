@@ -595,7 +595,7 @@ tr.exportTo('tr.ui.b', function() {
         const w = this.tableColumns_[i].width;
         if (w) {
           if (/\d+px/.test(w)) {
-            td.style.minWidth = calc(w, delta);
+            // td.style.minWidth = calc(w, delta);
           } else if (/\d+%/.test(w)) {
             td.style.width = w;
           } else {
@@ -760,6 +760,7 @@ tr.exportTo('tr.ui.b', function() {
           } else {
             td.style.paddingLeft = INDENT_SPACE_NO_BUTTON + 'px';
           }
+          td.style.paddingRight = '20px';
         }
 
         if (value !== undefined) {
