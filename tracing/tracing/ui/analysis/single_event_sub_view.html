@@ -114,6 +114,7 @@ Polymer({
 
   getEventRowsHelper_(event) {
     const rows = [];
+    const extraInfo = event.args && event.args.__extra
 
     if (event.error) {
       rows.push({ name: 'Error', value: event.error });
@@ -129,14 +130,18 @@ Polymer({
         container.appendChild(link);
         title = container;
       }
-      rows.push({ name: 'Title', value: title });
+      if (extraInfo) {
+        rows.push({ name: 'Function', value: title });
+      } else {
+        rows.push({ name: 'Title', value: title });
+      }
     }
 
-    if (event.category) {
+    if (!extraInfo && event.category) {
       rows.push({ name: 'Category', value: event.category });
     }
 
-    if (event.model !== undefined) {
+    if (!extraInfo && event.model !== undefined) {
       const ufc = event.model.getUserFriendlyCategoryFromEvent(event);
       if (ufc !== undefined) {
         rows.push({ name: 'User Friendly Category', value: ufc });
@@ -147,6 +152,7 @@ Polymer({
       rows.push({ name: 'Name', value: event.name });
     }
 
+
     rows.push({
       name: 'Start',
       value: tr.v.ui.createScalarSpan(event.start, {
@@ -156,7 +162,7 @@ Polymer({
 
     if (event.duration) {
       rows.push({
-        name: 'Wall Duration',
+        name: 'Total Time',
         value: tr.v.ui.createScalarSpan(event.duration, {
           unit: tr.b.Unit.byName.timeDurationInMs
         })
@@ -227,6 +233,17 @@ Polymer({
     } else if (event.endStackFrame) {
       rows.push({ name: 'End Stack Trace',
         value: createStackFrameEl(event.endStackFrame)});
+    }
+
+    if (extraInfo && extraInfo.desc) {
+      const descriptionEl = tr.ui.b.createDiv({
+        textContent: extraInfo.desc,
+        maxWidth: '300px'
+      });
+      rows.push({
+        name: 'Description',
+        value: descriptionEl
+      });
     }
 
     if (event.info) {
@@ -340,7 +357,7 @@ Polymer({
     const rows = this.getEventRows_(event);
     if (event.argsStripped) {
       rows.push({ name: 'Args', value: 'Stripped' });
-    } else {
+    } else if (!event.args.__extra) {
       this.addArgsToRows_(rows, event.args);
     }
     this.addContextsToRows_(rows, event.contexts);
